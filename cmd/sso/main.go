@@ -1,10 +1,13 @@
 package main
 
 import (
+	"github.com/goget-milk/sso/internal/app"
 	"github.com/goget-milk/sso/internal/config"
 	"github.com/goget-milk/sso/internal/lib/handlers/slogpretty"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -22,8 +25,23 @@ func main() {
 		slog.Any("config", cfg),
 	)
 
+	application := app.New(log, cfg.GRPC.Port, cfg.StoragePath, cfg.TokenTTL)
+
+	go application.GRPCServer.MustRun()
+
 	// TODO: Init application (app)
 	// TODO: Run applications gRPC-server
+
+	// Graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+	sign := <-stop
+
+	log.Info("stopping application", slog.String("signal", sign.String()))
+
+	application.GRPCServer.Stop()
+
+	log.Info("application stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
